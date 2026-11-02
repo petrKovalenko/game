@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="AbilityResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/data/ability_resource.gd" id="1_ab"]
+
+[resource]
+script = ExtResource("1_ab")
+id = "strike"
+display_name = "Удар"
+attack_range = 1
+damage_multiplier = 1.0

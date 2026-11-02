@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="UnitResource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/data/unit_resource.gd" id="1_un"]
+[ext_resource type="Resource" path="res://src/data/abilities/strike.tres" id="2_st"]
+
+[resource]
+script = ExtResource("1_un")
+id = "warrior"
+display_name = "Воин"
+hp = 30
+damage = 6
+initiative = 6
+move_limit = 3
+abilities = [ExtResource("2_st")]
+color = Color(0.25, 0.5, 0.9, 1)
