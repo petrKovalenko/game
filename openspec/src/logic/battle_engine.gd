@@ -69,6 +69,7 @@ func end_turn() -> void:
 	turn_index += 1
 	if turn_index >= round_order.size():
 		_start_round()
+		turn_index = 0
 	var unit: BattleUnit = round_order[turn_index]
 	if not unit.is_alive():
 		end_turn()

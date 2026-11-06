@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_test_pathfinding()
 	_test_reachable()
 	_test_turn_queue()
+	_test_round_wrap()
 	_test_combat()
 	_test_end_conditions()
 	_test_ai()
@@ -81,9 +82,12 @@ func _test_pathfinding() -> void:
 		assert_true(path[path.size() - 1] == Vector2i(4, 0), "путь заканчивается целью")
 	var no_path := grid.find_path(Vector2i(0, 0), Vector2i(2, 0))
 	assert_true(no_path.is_empty(), "цель-стена: путь не найден")
-	var occupied := {Vector2i(0, 1): true, Vector2i(1, 1): true}
+	var occupied := {Vector2i(0, 1): true}
 	var around := grid.find_path(Vector2i(0, 0), Vector2i(0, 2), occupied)
 	assert_true(not around.is_empty(), "путь огибает занятые клетки")
+	if not around.is_empty():
+		assert_true(around.size() > 2, "путь длиннее прямого (обход занятой клетки)")
+		assert_true(around[around.size() - 1] == Vector2i(0, 2), "обходной путь заканчивается целью")
 
 
 func _test_reachable() -> void:
@@ -120,6 +124,51 @@ func _test_turn_queue() -> void:
 		if engine_a.round_order[i].id != engine_b.round_order[i].id:
 			same = false
 	assert_true(same, "одинаковый seed даёт одинаковый порядок раунда")
+
+
+## Регрессия fix-turn-handoff: переход хода на новый раунд после хода противников.
+func _test_round_wrap() -> void:
+	print("[BattleEngine.end_turn] переход раунда")
+	var engine := _make_engine(9)
+	var hero := _make_unit(BattleUnit.TEAM_PLAYER, 20, 5, 9, 2, Vector2i(0, 0), 1)
+	var hero2 := _make_unit(BattleUnit.TEAM_PLAYER, 20, 5, 7, 2, Vector2i(0, 1), 1)
+	var foe := _make_unit(BattleUnit.TEAM_ENEMY, 20, 5, 5, 2, Vector2i(3, 3), 1)
+	var foe2 := _make_unit(BattleUnit.TEAM_ENEMY, 20, 5, 3, 2, Vector2i(4, 4), 1)
+	engine.units = [hero, hero2, foe, foe2]
+	var started: Array = []
+	engine.turn_started.connect(func(u: BattleUnit) -> void: started.append(u))
+	engine.start_battle()
+	assert_true(engine.active_unit() == hero, "первый ход — герой с инициативой 9")
+	# Завершаем ходы всех юнитов раунда: после start_battle осталось 3 хода,
+	# четвёртый end_turn открывает новый раунд.
+	engine.end_turn()
+	engine.end_turn()
+	engine.end_turn()
+	engine.end_turn()
+	assert_true(engine.round_number == 2, "после хода последнего юнита начался раунд 2")
+	assert_true(engine.active_unit() == hero,
+			"ход перешёл к первому юниту нового раунда, а не к последнему")
+	assert_true(not started.is_empty() and started.back() == hero,
+			"turn_started излучён для первого юнита нового раунда")
+	assert_true(started.back() == engine.active_unit(),
+			"активный юнит согласован с сигналом начала хода")
+
+	# Погибшие юниты пропускаются, в том числе на границе раундов.
+	var engine2 := _make_engine(11)
+	var h1 := _make_unit(BattleUnit.TEAM_PLAYER, 20, 5, 9, 2, Vector2i(0, 0), 1)
+	var h2 := _make_unit(BattleUnit.TEAM_PLAYER, 20, 5, 7, 2, Vector2i(0, 1), 1)
+	var f1 := _make_unit(BattleUnit.TEAM_ENEMY, 20, 5, 5, 2, Vector2i(3, 3), 1)
+	var f2 := _make_unit(BattleUnit.TEAM_ENEMY, 20, 5, 3, 2, Vector2i(4, 4), 1)
+	engine2.units = [h1, h2, f1, f2]
+	h1.hp = 0
+	engine2.start_battle()
+	assert_true(engine2.active_unit() == h2, "погибший герой пропущен при старте боя")
+	engine2.end_turn()
+	engine2.end_turn()
+	engine2.end_turn()
+	assert_true(engine2.round_number == 2, "после ходов всех живых врагов начался раунд 2")
+	assert_true(engine2.active_unit() == h2,
+			"на границе раундов погибший юнит пропущен")
 
 
 func _test_combat() -> void:
